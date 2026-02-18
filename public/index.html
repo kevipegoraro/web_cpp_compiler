@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Learner C++ Micro-Editor</title>
+
+  <!-- CodeMirror -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/codemirror.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/theme/dracula.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/codemirror.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/mode/clike/clike.min.js"></script>
+
+  <style>
+    :root{
+      --bg:#ffffff;
+      --text:#111111;
+      --muted:#444;
+      --panel:#111111;
+      --panelText:#eeeeee;
+      --border:#cccccc;
+      --btnBg:#f2f2f2;
+      --btnText:#111;
+    }
+    body.dark{
+      --bg:#0f1115;
+      --text:#e6e6e6;
+      --muted:#b8b8b8;
+      --panel:#0b0c0f;
+      --panelText:#e6e6e6;
+      --border:#2a2f3a;
+      --btnBg:#1b1f2a;
+      --btnText:#e6e6e6;
+    }
+
+    body{
+      font-family: Arial, sans-serif;
+      max-width: 1050px;
+      margin: 24px auto;
+      padding: 0 16px;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    h1{ margin: 0 0 10px; }
+    .hint{ font-size: 13px; color: var(--muted); margin-bottom: 10px; }
+
+    .row{
+      display:flex;
+      gap:10px;
+      align-items:center;
+      flex-wrap:wrap;
+      margin: 10px 0;
+    }
+
+    button{
+      padding: 8px 14px;
+      cursor:pointer;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--btnBg);
+      color: var(--btnText);
+    }
+
+    input{
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: transparent;
+      color: var(--text);
+      min-width: 240px;
+    }
+
+    .status{ font-size: 14px; color: var(--muted); }
+    .panel{ margin-top: 12px; }
+    pre{
+      background: var(--panel);
+      color: var(--panelText);
+      padding: 12px;
+      border-radius: 10px;
+      overflow: auto;
+      min-height: 15px;
+      border: 1px solid var(--border);
+      white-space: pre-wrap;
+    }
+
+    .CodeMirror{
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      height: 500px;
+      font-size: 14px;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>Learner C++ Micro-Editor</h1>
+  <div class="hint">
+    Runs locally. Programs have ~2s runtime limit. If your code waits for input, it may time out.
+  </div>
+
+  <div class="row">
+    <button id="themeBtn">🌙 Dark mode</button>
+
+    <input id="fileName" value="start_code.cpp" />
+    <button id="loadBtn">Load</button>
+    <button id="saveBtn">Save</button>
+
+    <button id="runBtn">Run</button>
+    <span class="status" id="status">Ready.</span>
+  </div>
+
+  <textarea id="code">
+#include <iostream>
+using namespace std;
+
+int main() {
+    cout << "Hello World!" << endl;
+    return 0;
+}
+  </textarea>
+
+  <div class="panel">
+    <h3>Program Input</h3>
+    <textarea id="inputBox" style="width:100%;height:120px;border-radius:10px;padding:8px;"></textarea>
+  </div>
+
+
+
+  <div class="panel">
+    <h3>Output</h3>
+    <pre id="output">(nothing yet)</pre>
+  </div>
+
+  <script>
+    const statusEl = document.getElementById("status");
+    const outputEl = document.getElementById("output");
+    const runBtn = document.getElementById("runBtn");
+    const saveBtn = document.getElementById("saveBtn");
+    const loadBtn = document.getElementById("loadBtn");
+    const themeBtn = document.getElementById("themeBtn");
+    const fileNameEl = document.getElementById("fileName");
+
+    function setStatus(msg){ statusEl.textContent = msg; }
+    function setOutput(msg){ outputEl.textContent = msg; }
+
+    // Theme (saved in localStorage)
+    function applyTheme(isDark){
+      document.body.classList.toggle("dark", isDark);
+      editor.setOption("theme", isDark ? "dracula" : "default");
+      themeBtn.textContent = isDark ? "☀️ Light mode" : "🌙 Dark mode";
+      localStorage.setItem("editor_theme", isDark ? "dark" : "light");
+    }
+    const savedTheme = localStorage.getItem("editor_theme");
+    const startDark = savedTheme ? (savedTheme === "dark") : false;
+
+    const editor = CodeMirror.fromTextArea(document.getElementById("code"), {
+      mode: "text/x-c++src",
+      lineNumbers: true,
+      indentUnit: 4,
+      tabSize: 4,
+      lineWrapping: true,
+      theme: startDark ? "dracula" : "default"
+    });
+    applyTheme(startDark);
+
+    themeBtn.addEventListener("click", () => {
+      applyTheme(!document.body.classList.contains("dark"));
+    });
+
+    function safeName(){
+      // Keep it simple on the frontend; backend will also validate.
+      const name = (fileNameEl.value || "start_code.cpp").trim();
+      return name.length ? name : "start_code.cpp";
+    }
+
+    async function loadFile(){
+      const name = safeName();
+      setStatus("Loading " + name + "...");
+      try {
+        const res = await fetch("/load?name=" + encodeURIComponent(name));
+        const text = await res.text();
+        if (!res.ok) {
+          setOutput("Load failed:\n" + text);
+          setStatus("Load failed.");
+          return;
+        }
+        editor.setValue(text);
+        setStatus("Loaded " + name + ".");
+      } catch (e) {
+        setOutput("Load request failed: " + e);
+        setStatus("Load request failed.");
+      }
+    }
+
+    async function saveFile(){
+      const name = safeName();
+      setStatus("Saving " + name + "...");
+      try {
+        const res = await fetch("/save?name=" + encodeURIComponent(name), {
+          method: "POST",
+          headers: { "Content-Type": "text/plain; charset=utf-8" },
+          body: editor.getValue()
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok) {
+          setOutput("Save failed:\n" + (data.error || "Unknown error"));
+          setStatus("Save failed.");
+          return;
+        }
+        setStatus("Saved to user_codes/" + data.savedAs + " (" + data.bytes + " bytes).");
+      } catch (e) {
+        setOutput("Save request failed: " + e);
+        setStatus("Save request failed.");
+      }
+    }
+
+    async function runCode(){
+      runBtn.disabled = true;
+      setStatus("Compiling / running...");
+      try {
+        const res = await fetch("/run", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            code: editor.getValue(),
+            input: document.getElementById("inputBox").value
+          })
+
+        });
+
+        const data = await res.json();
+
+        if (!data.ok) {
+          setOutput("❌ Error:\n" + (data.error || data.output || "Unknown error"));
+          setStatus("Error.");
+        } else {
+          let out = "";
+          out += "exit_code: " + data.exit_code + "\n";
+          if (data.timed_out) out += "⏱ Timed out\n";
+          out += "\n▶ Output:\n" + (data.output || "");
+          setOutput(out);
+          setStatus(data.timed_out ? "Timed out." : "Done.");
+        }
+
+      } catch (e) {
+        setOutput("Request failed: " + e);
+        setStatus("Request failed.");
+      } finally {
+        runBtn.disabled = false;
+      }
+    }
+
+    loadBtn.addEventListener("click", loadFile);
+    saveBtn.addEventListener("click", saveFile);
+    runBtn.addEventListener("click", runCode);
+
+    // Load star_code.cpp on start
+    loadFile();
+  </script>
+</body>
+</html>

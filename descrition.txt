@@ -1,0 +1,39 @@
+Perfeito — vou explicar em texto corrido, de forma técnica e detalhada, mas sem mostrar código.
+
+---
+
+O servidor que você construiu é uma aplicação de baixo nível baseada em programação de sistemas no ambiente Linux/Unix. Ele utiliza a API de sockets POSIX para implementar um servidor HTTP manualmente, sem frameworks externos. Isso significa que toda a comunicação TCP é feita diretamente através das funções do sistema operacional, como criação de socket, associação a uma porta, escuta por conexões e aceitação de clientes. Ao invés de usar bibliotecas como Boost.Beast ou frameworks web prontos, você implementou o protocolo HTTP “na mão”, interpretando as requisições brutas enviadas pelo navegador.
+
+A camada de rede utiliza sockets TCP (AF_INET, SOCK_STREAM), configurados para escutar na porta 8080 e vinculados ao endereço de loopback (127.0.0.1), o que restringe o acesso apenas à máquina local. Isso é uma prática importante de segurança durante desenvolvimento, pois impede exposição acidental na rede. O servidor opera em modo iterativo: ele aceita uma conexão, processa a requisição inteira, envia a resposta e fecha a conexão. Não há paralelismo ou multithreading neste estágio, o que simplifica a arquitetura.
+
+Acima da camada de rede está a implementação do protocolo HTTP. O servidor lê dados brutos do socket e detecta o final dos cabeçalhos HTTP através do separador padrão “\r\n\r\n”. Ele então interpreta a primeira linha da requisição (método, caminho e versão HTTP), processa os cabeçalhos em um mapa associativo e extrai o corpo da mensagem quando presente, utilizando o cabeçalho Content-Length para determinar o tamanho exato. Essa abordagem demonstra entendimento do funcionamento interno do HTTP/1.1, incluindo a necessidade de respeitar o tamanho do corpo para requisições POST.
+
+O roteamento das requisições é feito manualmente através da análise do método (GET ou POST) e do caminho solicitado. Cada rota corresponde a uma funcionalidade específica: servir o arquivo HTML principal, compilar código, executar código, carregar arquivos salvos ou persistir novos arquivos no diretório local. Essa lógica representa uma implementação básica de um “router” semelhante ao que frameworks web fazem internamente.
+
+Para o gerenciamento de arquivos, o projeto utiliza a biblioteca padrão moderna de C++ (std::filesystem). Ela é empregada para criar diretórios dinamicamente, manipular caminhos de forma segura e remover diretórios temporários após a execução do código. A leitura e escrita de arquivos são feitas com streams binários, garantindo que o conteúdo seja tratado corretamente independentemente do sistema.
+
+Uma parte essencial da arquitetura é o mecanismo de execução de processos externos. Para compilar e executar código C++, o servidor utiliza o modelo clássico fork/exec do Unix. Primeiro, ele cria um novo processo filho com fork. Em seguida, substitui a imagem desse processo pelo compilador (g++) ou pelo binário gerado, utilizando execvp. Essa técnica é fundamental em sistemas Unix para execução de programas externos, pois mantém o servidor principal separado da execução do código do usuário.
+
+Para capturar a saída padrão e os erros do processo filho, o servidor usa pipes. O pipe cria um canal de comunicação entre o processo filho e o processo pai. A saída padrão (stdout) e a saída de erro (stderr) do programa executado são redirecionadas para o pipe, permitindo que o servidor capture toda a saída e a envie de volta ao navegador como resposta JSON. Esse mecanismo simula o comportamento de sistemas de juízes online e plataformas de execução remota de código.
+
+A aplicação também implementa um mecanismo básico de sandbox utilizando setrlimit. Essa função do sistema operacional permite limitar recursos do processo filho, como tempo de CPU, uso máximo de memória (espaço de endereçamento), tamanho máximo de arquivo gerado e número máximo de descritores de arquivos abertos. Essas restrições impedem que programas com loops infinitos, consumo excessivo de memória ou produção massiva de saída comprometam o sistema. Além disso, há um controle manual de timeout utilizando medições de tempo com a biblioteca chrono. Se o programa exceder o tempo permitido, o servidor envia um sinal SIGKILL ao grupo de processos, garantindo encerramento forçado.
+
+Outro aspecto importante é a validação de entrada do usuário. O servidor inclui mecanismos de sanitização de nomes de arquivos usando expressões regulares. Isso previne ataques de directory traversal, como tentativas de acessar caminhos fora do diretório permitido (por exemplo, usando “../”). Essa prática é fundamental em aplicações que manipulam caminhos fornecidos pelo cliente.
+
+A comunicação de resultados para o frontend é feita em formato JSON. O servidor constrói manualmente as respostas JSON e aplica escaping adequado para caracteres especiais, garantindo que a resposta seja válida e não quebre o parser JavaScript no navegador. Esse cuidado demonstra entendimento da necessidade de serialização segura de dados.
+
+Do lado do frontend, a interface é construída com HTML, CSS e JavaScript puro. Para edição de código, foi integrada a biblioteca CodeMirror, que fornece destaque de sintaxe, numeração de linhas e suporte a temas (como modo escuro). A comunicação com o backend é realizada através da API Fetch do navegador, enviando requisições assíncronas para as rotas definidas no servidor. Isso caracteriza um modelo cliente-servidor baseado em AJAX, onde a página não precisa recarregar para executar código ou salvar arquivos.
+
+Em termos arquiteturais, o sistema combina:
+
+– Programação de sistemas (sockets, fork, exec, pipes, sinais)
+– Implementação manual de protocolo HTTP
+– Gerenciamento de processos e sandboxing básico
+– Manipulação segura de arquivos
+– Comunicação cliente-servidor via JSON
+– Interface web dinâmica com JavaScript assíncrono
+– Uso de bibliotecas padrão modernas do C++ (C++17)
+
+Na prática, você construiu uma mini-plataforma de execução de código semelhante, em conceito, a serviços como juízes online ou ambientes de programação remotos, porém executando localmente. A principal diferença para sistemas profissionais está no isolamento avançado (como containers Docker, seccomp, namespaces e usuários não privilegiados), que seriam necessários para exposição pública segura.
+
+Em resumo, o projeto utiliza técnicas fundamentais de sistemas operacionais, redes, protocolos, compiladores e desenvolvimento web, integradas em uma arquitetura cliente-servidor completa, implementada praticamente do zero.

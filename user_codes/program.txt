@@ -1,0 +1,23 @@
+comment "Print needs qouetes"
+comment "Add functions"
+comment "Add api to AI"
+commant "write to files/open files"
+print "Hello World"
+set x = 10
+print x
+add x 5
+comment "We can do comments now!!"
+add x 50
+add x 5000
+print "After adding:"
+print x
+print "Start Loop"
+comment "Loops are form 0 to one before the specified value"
+loop i:15 (
+comment "Add one to print from 1 to 15
+set aux = i
+add aux 1
+print aux
+)
+print "Done"
+
