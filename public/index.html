@@ -192,6 +192,8 @@ Runs locally. Programs have ~2s runtime limit.
   <button id="loadBtn">Load</button>
   <button id="saveBtn">Save</button>
   <button id="runBtn">Run</button>
+  <button id="runNanBtn">Run nanLanguage Script</button>
+
 
   <span class="status" id="status">Ready.</span>
 </div>
@@ -280,6 +282,7 @@ print x</textarea>
 const statusEl = document.getElementById("status");
 const outputEl = document.getElementById("output");
 const runBtn = document.getElementById("runBtn");
+const runNanBtn = document.getElementById("runNanBtn");
 const saveBtn = document.getElementById("saveBtn");
 const loadBtn = document.getElementById("loadBtn");
 const themeBtn = document.getElementById("themeBtn");
@@ -406,6 +409,42 @@ async function runCode(){
     runBtn.disabled = false;
   }
 }
+
+async function runNanProgram(){
+  runNanBtn.disabled = true;
+  setStatus("Running nanLanguage script...");
+
+  try{
+    const res = await fetch("/run-nan",{
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body:JSON.stringify({
+        program: document.getElementById("inputBox").value
+      })
+    });
+
+    const data = await res.json();
+
+    if(!data.ok){
+      setOutput("Error:\n"+(data.error || "Unknown error"));
+    }else{
+      let out="";
+      out += "exit_code: " + data.exit_code + "\n";
+      if(data.timed_out) out += "Timed out\n";
+      out += "\nOutput:\n" + (data.output || "");
+      setOutput(out);
+      setStatus("Done.");
+    }
+
+  }catch(e){
+    setOutput("Request failed: " + e);
+  }finally{
+    runNanBtn.disabled = false;
+  }
+}
+
+runNanBtn.addEventListener("click", runNanProgram);
+
 
 loadBtn.addEventListener("click", loadFile);
 saveBtn.addEventListener("click", saveFile);

@@ -418,6 +418,31 @@ static std::string handle_run_cpp(const std::string& code,
     return json;
 }
 
+static std::string handle_run_nan(const std::string& program)
+{
+    std::string binary_path = "user_codes/temp.out"; 
+    // change path if needed
+
+    if (!std::filesystem::exists(binary_path)) {
+        return R"({"ok":false,"error":"nan_interpreter binary not found"})";
+    }
+
+    ProcResult run = run_process_capture(
+        {binary_path},
+        program,   // send script via stdin
+        2000,
+        true       // apply resource limits
+    );
+
+    std::string json = "{";
+    json += "\"ok\":true,";
+    json += "\"exit_code\":" + std::to_string(run.exit_code) + ",";
+    json += "\"timed_out\":" + std::string(run.timed_out ? "true" : "false") + ",";
+    json += "\"output\":\"" + json_escape(run.output) + "\"";
+    json += "}";
+
+    return json;
+}
 
 
 
@@ -542,6 +567,36 @@ else if (req.method == "POST" && req.path == "/run") {
                 }
             }
         }
+
+        else if (req.method == "POST" && path == "/run-nan") {
+    try {
+        auto j = json::parse(req.body);
+
+        std::string program = j.value("program", "");
+
+        if (program.empty()) {
+            auto resp = http_response(400, "Bad Request",
+                "application/json; charset=utf-8",
+                R"({"ok":false,"error":"Missing 'program'"})");
+            send_all(client_fd, resp);
+            close(client_fd);
+            continue;
+        }
+
+        std::string out_json = handle_run_nan(program);
+
+        auto resp = http_response(200, "OK",
+            "application/json; charset=utf-8", out_json);
+        send_all(client_fd, resp);
+    }
+    catch (const std::exception& e) {
+        std::string err = std::string("{\"ok\":false,\"error\":\"Invalid JSON: ")
+                        + json_escape(e.what()) + "\"}";
+        auto resp = http_response(400, "Bad Request",
+            "application/json; charset=utf-8", err);
+        send_all(client_fd, resp);
+    }
+}
         
         
         else if (req.method == "POST" && path == "/save") {
