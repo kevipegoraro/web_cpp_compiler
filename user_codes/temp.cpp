@@ -3,7 +3,7 @@
 #include <string>       // For std::string
 #include <map>          // For storing variables
 #include <fstream>      // For reading files
-
+#include <cmath> // for math functions
 // ===============================
 // Simple Interpreter Class
 // ===============================
@@ -180,6 +180,50 @@ private:
             }
         }
 
+        else if (command == "printl") {
+
+            // Get everything after the word "print"
+            std::string restOfLine;
+            std::getline(ss, restOfLine);
+
+            // Remove leading space (because getline keeps it)
+            if (!restOfLine.empty() && restOfLine[0] == ' ')
+                restOfLine.erase(0, 1);
+
+            // ---------------------------------------
+            // Case 1: If it's a quoted string
+            // Example:
+            // print "Hello World"
+            // ---------------------------------------
+            if (restOfLine.size() >= 2 &&
+                restOfLine.front() == '"' &&
+                restOfLine.back() == '"') {
+
+                // Remove the quotes
+                std::string text =
+                    restOfLine.substr(1, restOfLine.size() - 2);
+
+                std::cout << text;
+            }
+
+            // ---------------------------------------
+            // Case 2: If it's a variable name
+            // Example:
+            // print x
+            // ---------------------------------------
+            else {
+
+                if (variables.count(restOfLine)) {
+                    std::cout << variables[restOfLine] << std::endl;
+                }
+                else {
+                    // If not a variable, just print as-is
+                    std::cout << restOfLine;
+                }
+            }
+        }
+
+
         // =========================
         // SET COMMAND
         // =========================
@@ -282,6 +326,27 @@ private:
             }
         }
 
+        // =========================
+        // POW COMMAND
+        // Example:
+        // pow x 3
+        // =========================
+        else if (command == "pow") {
+
+            std::string var;
+            int value;
+
+            ss >> var >> value;
+
+            if (variables.count(var)) {
+                variables[var] = std::pow(variables[var], value);
+            }
+            else {
+                std::cout << "Error: variable '" << var << "' not found\n";
+            }
+        }
+
+        
         // =========================
         // DIV COMMAND
         // Example:

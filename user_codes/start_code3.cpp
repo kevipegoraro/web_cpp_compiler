@@ -57,10 +57,18 @@ void execute(const std::string& code) {
                 std::cout << "Syntax error: expected (\n";
                 continue;
             }
-            
-            // Calculate block separately to support nested loops and ifs
-            std::string block = readBlock(stream);
 
+            // Collect block lines
+            std::string block;
+            std::string blockLine;
+
+            while (std::getline(stream, blockLine)) {
+
+                if (blockLine == ")")
+                    break;
+
+                block += blockLine + "\n";
+            }
 
             // Execute loop
             for (int i = 0; i < count; i++) {
@@ -69,37 +77,6 @@ void execute(const std::string& code) {
                 execute(block);  // Recursive call
             }
         }
-
-                // =========================
-        // IF COMMAND
-        // =========================
-        else if (command == "if") {
-
-            // Get rest of line after "if"
-            std::string condition;
-            std::getline(ss, condition);
-
-            // Remove trailing "("
-            if (!condition.empty() && condition.back() == '(')
-                condition.pop_back();
-
-            // Trim spaces
-            condition.erase(0, condition.find_first_not_of(" "));
-            condition.erase(condition.find_last_not_of(" ") + 1);
-
-            // Expect "("
-            std::string openParen;
-            ss >> openParen;
-
-            // If "(" is not at the end of line, it means condition is separated by space
-            std::string block = readBlock(stream);
-
-
-            if (evaluateCondition(condition)) {
-                execute(block);
-            }
-        }
-
 
         else {
             runLine(line);
@@ -243,135 +220,12 @@ private:
         }
 
         // =========================
-        // SUB COMMAND
-        // Example:
-        // sub x 3
-        // =========================
-        else if (command == "sub") {
-
-            std::string var;
-            int value;
-
-            ss >> var >> value;
-
-            if (variables.count(var)) {
-                variables[var] -= value;
-            }
-            else {
-                std::cout << "Error: variable '" << var << "' not found\n";
-            }
-        }
-
-        // =========================
-        // MULT COMMAND
-        // Example:
-        // mult x 3
-        // =========================
-        else if (command == "mult") {
-
-            std::string var;
-            int value;
-
-            ss >> var >> value;
-
-            if (variables.count(var)) {
-                variables[var] *= value;
-            }
-            else {
-                std::cout << "Error: variable '" << var << "' not found\n";
-            }
-        }
-
-        // =========================
-        // DIV COMMAND
-        // Example:
-        // div x 2
-        // =========================
-        else if (command == "div") {
-
-            std::string var;
-            int value;
-
-            ss >> var >> value;
-
-            if (!variables.count(var)) {
-                std::cout << "Error: variable '" << var << "' not found\n";
-                return;
-            }
-
-            if (value == 0) {
-                std::cout << "Error: division by zero\n";
-                return;
-            }
-
-            variables[var] /= value;
-        }
-
-        // =========================
         // UNKNOWN COMMAND
         // =========================
         else {
             std::cout << "Unknown command: " << command << std::endl;
         }
     }
-    
-    bool evaluateCondition(const std::string& condition) {
-
-        std::istringstream ss(condition);
-
-        std::string left, op, right;
-        ss >> left >> op >> right;
-
-        int leftVal = 0;
-        int rightVal = 0;
-
-        // Left value
-        if (variables.count(left))
-            leftVal = variables[left];
-        else
-            leftVal = std::stoi(left);
-
-        // Right value
-        if (variables.count(right))
-            rightVal = variables[right];
-        else
-            rightVal = std::stoi(right);
-
-        // Comparison
-        if (op == ">")  return leftVal > rightVal;
-        if (op == "<")  return leftVal < rightVal;
-        if (op == ">=") return leftVal >= rightVal;
-        if (op == "<=") return leftVal <= rightVal;
-        if (op == "==") return leftVal == rightVal;
-        if (op == "!=") return leftVal != rightVal;
-
-        std::cout << "Invalid operator in condition\n";
-        return false;
-    }
-
-    std::string readBlock(std::istringstream& stream) {
-    std::string block;
-    std::string line;
-    int depth = 1;
-
-    while (std::getline(stream, line)) {
-
-        for (char c : line) {
-            if (c == '(') depth++;
-            else if (c == ')') depth--;
-        }
-
-        if (depth == 0)
-            break;
-
-        block += line + "\n";
-    }
-
-    return block;
-}
-
-
-
 };
 
 // ============================================
@@ -387,3 +241,6 @@ int main() {
 
     return 0;
 }
+
+
+
